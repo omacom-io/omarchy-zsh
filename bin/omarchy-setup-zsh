@@ -3,8 +3,8 @@ set -e
 
 ZSHRC="${HOME}/.zshrc"
 BASHRC="${HOME}/.bashrc"
-ZSHRC_TEMPLATE="/usr/share/omarchy-zsh/zshrc"
-BASHRC_TEMPLATE="/usr/share/omarchy-zsh/bashrc"
+ZSHRC_TEMPLATE="/usr/share/omarchy-zsh/templates/zshrc"
+BASHRC_TEMPLATE="/usr/share/omarchy-zsh/templates/bashrc"
 ZSHRC_BACKUP="${HOME}/.zshrc.backup-$(date +%Y%m%d-%H%M%S)"
 BASHRC_BACKUP="${HOME}/.bashrc.backup-$(date +%Y%m%d-%H%M%S)"
 
