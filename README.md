@@ -1,6 +1,6 @@
 Omarchy shell configuration for Zsh shell.
 
-## Installation
+## Install
 ```bash
 # Install the package
 sudo pacman -S omarchy-zsh
@@ -23,14 +23,14 @@ To add your own configuration or override defaults:
 
 ```bash
 # Edit your .zshrc
-nano ~/.zshrc
+nvim ~/.zshrc
 
 # Add customizations at the bottom after the omarchy-zsh loading
 ```
 
 User customizations in `~/.zshrc` take precedence over system defaults.
 
-## Uninstallation
+## Uninstall
 
 ```bash
 sudo pacman -R omarchy-zsh
