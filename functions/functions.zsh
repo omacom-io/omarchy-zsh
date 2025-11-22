@@ -17,6 +17,17 @@ open() {
   xdg-open "$@" >/dev/null 2>&1 &
 }
 
+# Alias git to g
+# No arguments: `git status`
+# With arguments: acts like `git`
+g() {
+  if [[ $# -gt 0 ]]; then
+    git "$@"
+  else
+    git status
+  fi
+}
+
 # Neovim wrapper
 n() {
   if [ "$#" -eq 0 ]; then
