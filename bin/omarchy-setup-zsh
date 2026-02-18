@@ -5,6 +5,7 @@ ZSHRC="${HOME}/.zshrc"
 BASHRC="${HOME}/.bashrc"
 ZSHRC_TEMPLATE="/usr/share/omarchy-zsh/templates/zshrc"
 BASHRC_TEMPLATE="/usr/share/omarchy-zsh/templates/bashrc"
+INPUTRC_SRC="/usr/share/omarchy-zsh/shell/inputrc"
 ZSHRC_BACKUP="${HOME}/.zshrc.backup-$(date +%Y%m%d-%H%M%S)"
 BASHRC_BACKUP="${HOME}/.bashrc.backup-$(date +%Y%m%d-%H%M%S)"
 
@@ -14,15 +15,16 @@ echo "Setting zsh as your default shell..."
 if [ -f "${ZSHRC}" ]; then
   cp "${ZSHRC}" "${ZSHRC_BACKUP}"
 fi
-
 cp "${ZSHRC_TEMPLATE}" "${ZSHRC}"
 
 # Install bash auto-launch
 if [ -f "${BASHRC}" ]; then
   cp "${BASHRC}" "${BASHRC_BACKUP}"
 fi
-
 cp "${BASHRC_TEMPLATE}" "${BASHRC}"
+
+# Install inputrc (bash reads ~/.inputrc directly)
+cp -f "${INPUTRC_SRC}" "${HOME}/.inputrc"
 
 echo ""
 echo -e "\033[32m✓ zsh setup complete\033[0m"
