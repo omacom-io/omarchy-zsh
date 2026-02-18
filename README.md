@@ -4,34 +4,20 @@ Omarchy shell configuration for Zsh shell.
 
 Shared shell config (aliases, functions, environment, init) is pulled from [omadots](https://github.com/omacom-io/omadots) at package build time. This repo only contains the zsh-specific bits. Config is sourced directly from `/usr/share/` so package updates take effect immediately.
 
+### Build
+
 ```mermaid
-graph TD
-    subgraph "Package Build"
-        omadots["omadots/config/shell/
-        all, aliases, functions,
-        envs, inits, inputrc"]
-        zsh_repo["omarchy-zsh/
-        zoptions, templates, bin"]
-        omadots --> pkg["/usr/share/omarchy-zsh/shell/"]
-        zsh_repo --> pkg
-    end
+graph LR
+    omadots[omadots] --> envs & aliases & functions & inits
+    zsh_repo[omarchy-zsh] --> zoptions
+    zsh_repo -->|templates| dotfiles["~/.zshrc, ~/.bashrc"]
 
-    subgraph "omarchy-setup-zsh (one time)"
-        zsh_repo -->|"cp templates/"| dotfiles["~/.zshrc + ~/.bashrc"]
-        pkg -->|"cp inputrc"| inputrc["~/.inputrc"]
-    end
-
-    subgraph "Runtime"
-        bash["bash starts"] --> bashrc["~/.bashrc"]
-        bashrc -->|"exec zsh"| zshrc["~/.zshrc"]
-        zshrc -->|source| zoptions["/usr/share/omarchy-zsh/shell/zoptions
-        (zsh-only: completion, keybinds, fzf widgets)"]
-        zshrc -->|source| all["/usr/share/omarchy-zsh/shell/all"]
-        all --> envs["envs"]
-        all --> aliases["aliases"]
-        all --> functions["functions"]
-        all --> inits["inits
-        (detects bash vs zsh at runtime)"]
+    subgraph "/usr/share/omarchy-zsh/shell/"
+        envs
+        aliases
+        functions
+        inits
+        zoptions
     end
 
     style omadots fill:#4a9,stroke:#333,color:#fff
@@ -43,7 +29,22 @@ graph TD
     style inits fill:#4a9,stroke:#333,color:#fff
 ```
 
-Green = shared with bash (from omadots), Blue = zsh-specific (from this repo).
+### Runtime
+
+```mermaid
+graph LR
+    bashrc[~/.bashrc] -->|exec zsh| zshrc[~/.zshrc]
+    zshrc --> zoptions & all
+    all --> envs & aliases & functions & inits
+
+    style zoptions fill:#68f,stroke:#333,color:#fff
+    style envs fill:#4a9,stroke:#333,color:#fff
+    style aliases fill:#4a9,stroke:#333,color:#fff
+    style functions fill:#4a9,stroke:#333,color:#fff
+    style inits fill:#4a9,stroke:#333,color:#fff
+```
+
+Green = shared (from omadots). Blue = zsh-specific (from this repo).
 
 ## Install
 
