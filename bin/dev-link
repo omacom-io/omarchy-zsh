@@ -73,9 +73,12 @@ fi
   printf 'unfunction _omarchy 2>/dev/null\n'
   printf 'autoload -Uz _omarchy\n'
   if [[ -n $omadots ]]; then
-    # Match the source order in /usr/share/omarchy-zsh/shell/all so dev
-    # overlays follow the same precedence as the packaged version.
-    for f in envs aliases functions inits; do
+    # Re-source the pure-data overlays in the same order as
+    # /usr/share/omarchy-zsh/shell/all. We skip `inits` on purpose:
+    # tool initializers (mise/starship/zoxide/try) aren't idempotent
+    # under re-source, and the system version already ran. Edits to
+    # inits need a real `bin/dev-pkg-test` rebuild to validate.
+    for f in envs aliases functions; do
       printf '[[ -f "%s/config/shell/%s" ]] && source "%s/config/shell/%s"\n' \
         "$omadots" "$f" "$omadots" "$f"
     done
