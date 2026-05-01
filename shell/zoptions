@@ -22,6 +22,15 @@ setopt ALWAYS_TO_END            # Move cursor to end after completion
 setopt MENU_COMPLETE            # Show completion menu on tab
 setopt AUTO_MENU                # Show completion menu on tab
 
+# Make omarchy-zsh's completions available before initializing compinit
+if [[ -d /usr/share/omarchy-zsh/shell/completions ]]; then
+  fpath=(/usr/share/omarchy-zsh/shell/completions $fpath)
+fi
+
+# Initialize the zsh completion system
+autoload -Uz compinit
+compinit -i
+
 # Directory navigation
 setopt AUTO_CD                  # cd by typing directory name
 setopt CHASE_LINKS              # Mark symlinked directories
