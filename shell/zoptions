@@ -66,6 +66,10 @@ unsetopt BEEP
 # Allow comments in interactive shells
 setopt INTERACTIVE_COMMENTS
 
+# Color man pages with bat
+export MANROFFOPT="-c"
+export MANPAGER="sh -c 'col -bx | bat -l man -p'"
+
 # Ensure mise works (disable command hashing)
 setopt NO_HASH_CMDS
 setopt NO_HASH_DIRS
