@@ -19,13 +19,17 @@ setopt HIST_VERIFY              # Don't execute immediately upon history expansi
 # Completion configuration
 setopt COMPLETE_IN_WORD         # Complete from both ends of word
 setopt ALWAYS_TO_END            # Move cursor to end after completion
-setopt MENU_COMPLETE            # Show completion menu on tab
+setopt MENU_COMPLETE            # Insert first match on tab, cycle on repeat
 setopt AUTO_MENU                # Show completion menu on tab
 
 # Initialize the zsh completion system. The _omarchy completion ships to
 # /usr/share/zsh/site-functions/, which is on the default fpath.
 autoload -Uz compinit
 compinit -i
+
+# zsh/complist provides the menuselect keymap and the highlighted
+# interactive completion menu (enabled below via `menu select`).
+zmodload zsh/complist
 
 # Directory navigation
 setopt AUTO_CD                  # cd by typing directory name
@@ -34,11 +38,23 @@ setopt CHASE_LINKS              # Mark symlinked directories
 # Case-insensitive completion
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' 'r:|=* l:|=*'
 
+# Interactive menu with the current selection highlighted.
+zstyle ':completion:*' menu select
+
+# Populate LS_COLORS so completion listings (and ls) get colors. Coreutils
+# `ls` falls back to built-in defaults, but the list-colors zstyle below
+# needs LS_COLORS to be exported.
+if [[ -z $LS_COLORS ]] && (( $+commands[dircolors] )); then
+  eval "$(dircolors -b)"
+fi
+
 # Colored completion listings
 zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
 
-# Show extra file information when completing (like ls -F)
-zstyle ':completion:*' file-list all
+# Use the column-grid completion layout (filenames only). Defensively delete
+# any prior `file-list` style so re-sourcing on top of an older system copy
+# of zoptions (e.g. via dev-link) doesn't leave the verbose ls -l listing.
+zstyle -d ':completion:*' file-list
 
 # Show all completions at once (no paging)
 zstyle ':completion:*' list-prompt ''
@@ -56,6 +72,12 @@ bindkey "^[[A" history-search-backward
 bindkey "^[[B" history-search-forward
 bindkey "^[[C" forward-char
 bindkey "^[[D" backward-char
+
+# Shift-Tab cycles the completion menu backwards. The main-keymap binding
+# kicks in on the first press; the menuselect binding handles subsequent
+# presses once the highlighted menu is active.
+bindkey '^[[Z' reverse-menu-complete
+bindkey -M menuselect '^[[Z' reverse-menu-complete
 
 # Extended globbing
 setopt EXTENDED_GLOB
