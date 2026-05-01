@@ -6,6 +6,56 @@ ZSHRC="${ZDOTDIR:-$HOME}/.zshrc"
 BEGIN_MARK="# >>> omarchy-zsh dev >>>"
 END_MARK="# <<< omarchy-zsh dev <<<"
 
+usage() {
+  cat <<USAGE
+Usage: bin/dev-link [--omadots PATH]
+
+Inject a marker block into ~/.zshrc that points fpath at this repo's
+working tree and re-sources zoptions, so edits take effect in new shells
+without rebuilding the package.
+
+Options:
+  --omadots PATH   Also overlay omadots' working tree (shell/aliases,
+                   envs, functions, inits) so edits to the shared shell
+                   config show up in dev shells. Defaults to
+                   \$OMARCHY_DEV_OMADOTS_PATH if set.
+USAGE
+}
+
+omadots=""
+while (( $# )); do
+  case "$1" in
+    --omadots)
+      omadots="${2:-}"
+      shift 2 || { usage >&2; exit 2; }
+      ;;
+    --omadots=*)
+      omadots="${1#--omadots=}"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+# Flag wins; otherwise fall back to the env var.
+omadots="${omadots:-${OMARCHY_DEV_OMADOTS_PATH:-}}"
+
+if [[ -n $omadots ]]; then
+  if [[ ! -d $omadots/config/shell ]]; then
+    echo "omadots path does not look right: $omadots/config/shell missing" >&2
+    exit 1
+  fi
+  omadots="$(cd -- "$omadots" && pwd)"
+fi
+
 if [[ ! -f $ZSHRC ]]; then
   echo "No ~/.zshrc found at $ZSHRC. Run omarchy-setup-zsh first." >&2
   exit 1
@@ -14,16 +64,29 @@ fi
 # zsh has no auto-prepended user vendor dir like fish's vendor_*.d/.
 # Instead of symlinking into /usr/share/zsh/site-functions/ (sudo), we inject
 # an idempotent block at the bottom of ~/.zshrc that points fpath at the
-# working tree and re-sources zoptions. New shells pick this up automatically.
-read -r -d '' SNIPPET <<EOF || true
-$BEGIN_MARK
-fpath=("$REPO/shell/completions" \$fpath)
-[[ -f "$REPO/shell/zoptions" ]] && source "$REPO/shell/zoptions"
-unfunction _omarchy 2>/dev/null
-autoload -Uz _omarchy
-print -P "%F{yellow}⚠ omarchy-zsh dev linked: %B$REPO%b — run 'bin/dev-unlink' to restore packaged version%f"
-$END_MARK
-EOF
+# working tree, re-sources zoptions, and (optionally) shadows omadots'
+# shared shell config from a local checkout.
+{
+  printf '%s\n' "$BEGIN_MARK"
+  printf 'fpath=("%s/shell/completions" $fpath)\n' "$REPO"
+  printf '[[ -f "%s/shell/zoptions" ]] && source "%s/shell/zoptions"\n' "$REPO" "$REPO"
+  printf 'unfunction _omarchy 2>/dev/null\n'
+  printf 'autoload -Uz _omarchy\n'
+  if [[ -n $omadots ]]; then
+    # Match the source order in /usr/share/omarchy-zsh/shell/all so dev
+    # overlays follow the same precedence as the packaged version.
+    for f in envs aliases functions inits; do
+      printf '[[ -f "%s/config/shell/%s" ]] && source "%s/config/shell/%s"\n' \
+        "$omadots" "$f" "$omadots" "$f"
+    done
+    printf 'print -P "%%F{yellow}⚠ omarchy-zsh dev linked: %%B%s%%b (omadots: %%B%s%%b) — run %%U'\''bin/dev-unlink'\''%%u to restore packaged version%%f"\n' \
+      "$REPO" "$omadots"
+  else
+    printf 'print -P "%%F{yellow}⚠ omarchy-zsh dev linked: %%B%s%%b — run %%U'\''bin/dev-unlink'\''%%u to restore packaged version%%f"\n' \
+      "$REPO"
+  fi
+  printf '%s\n' "$END_MARK"
+} > "$ZSHRC.snippet"
 
 # Always drop any existing block, then append fresh — keeps the script
 # idempotent without conditional plumbing and survives manual edits inside
@@ -35,7 +98,10 @@ awk '
 ' "$ZSHRC" > "$ZSHRC.tmp"
 mv "$ZSHRC.tmp" "$ZSHRC"
 
-printf '\n%s\n' "$SNIPPET" >> "$ZSHRC"
+printf '\n' >> "$ZSHRC"
+cat "$ZSHRC.snippet" >> "$ZSHRC"
+rm -f "$ZSHRC.snippet"
 
 echo "Linked $REPO into $ZSHRC"
+[[ -n $omadots ]] && echo "Overlaying omadots from $omadots"
 echo "Open a new zsh shell to pick up the working-tree version."
