@@ -1,0 +1,41 @@
+#!/bin/bash
+set -euo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+ZSHRC="${ZDOTDIR:-$HOME}/.zshrc"
+BEGIN_MARK="# >>> omarchy-zsh dev >>>"
+END_MARK="# <<< omarchy-zsh dev <<<"
+
+if [[ ! -f $ZSHRC ]]; then
+  echo "No ~/.zshrc found at $ZSHRC. Run omarchy-setup-zsh first." >&2
+  exit 1
+fi
+
+# zsh has no auto-prepended user vendor dir like fish's vendor_*.d/.
+# Instead of symlinking into /usr/share/zsh/site-functions/ (sudo), we inject
+# an idempotent block at the bottom of ~/.zshrc that points fpath at the
+# working tree and re-sources zoptions. New shells pick this up automatically.
+read -r -d '' SNIPPET <<EOF || true
+$BEGIN_MARK
+fpath=("$REPO/shell/completions" \$fpath)
+[[ -f "$REPO/shell/zoptions" ]] && source "$REPO/shell/zoptions"
+unfunction _omarchy 2>/dev/null
+autoload -Uz _omarchy
+print -P "%F{yellow}⚠ omarchy-zsh dev linked: %B$REPO%b — run 'bin/dev-unlink' to restore packaged version%f"
+$END_MARK
+EOF
+
+# Always drop any existing block, then append fresh — keeps the script
+# idempotent without conditional plumbing and survives manual edits inside
+# the block. Match marker prefix so older block variants are still caught.
+awk '
+  /^# >>> omarchy-zsh dev/ { skip=1; next }
+  skip && /^# <<< omarchy-zsh dev/ { skip=0; next }
+  !skip { print }
+' "$ZSHRC" > "$ZSHRC.tmp"
+mv "$ZSHRC.tmp" "$ZSHRC"
+
+printf '\n%s\n' "$SNIPPET" >> "$ZSHRC"
+
+echo "Linked $REPO into $ZSHRC"
+echo "Open a new zsh shell to pick up the working-tree version."

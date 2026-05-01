@@ -22,6 +22,11 @@ setopt ALWAYS_TO_END            # Move cursor to end after completion
 setopt MENU_COMPLETE            # Show completion menu on tab
 setopt AUTO_MENU                # Show completion menu on tab
 
+# Initialize the zsh completion system. The _omarchy completion ships to
+# /usr/share/zsh/site-functions/, which is on the default fpath.
+autoload -Uz compinit
+compinit -i
+
 # Directory navigation
 setopt AUTO_CD                  # cd by typing directory name
 setopt CHASE_LINKS              # Mark symlinked directories
@@ -41,6 +46,10 @@ zstyle ':completion:*' select-prompt ''
 
 # Don't complete hidden files unless explicitly starting with dot
 zstyle ':completion:*' match-hidden-files off
+
+# Hide individual omarchy-* binaries from initial-word command completion;
+# the unified `omarchy` dispatcher is the user-facing entry point.
+zstyle ':completion:*:-command-:*' ignored-patterns 'omarchy-*'
 
 # Arrow keys: history search matching current input
 bindkey "^[[A" history-search-backward
