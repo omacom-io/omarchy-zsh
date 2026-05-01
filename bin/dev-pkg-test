@@ -1,0 +1,50 @@
+#!/bin/bash
+set -euo pipefail
+
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+PKGBUILD_SRC="${1:-$HOME/Work/omarchy/omarchy-pkgs/pkgbuilds/edge/omarchy-zsh}"
+
+if [[ ! -f $PKGBUILD_SRC/PKGBUILD ]]; then
+  echo "PKGBUILD not found in: $PKGBUILD_SRC" >&2
+  echo "Pass the directory containing PKGBUILD as the first argument." >&2
+  exit 1
+fi
+
+pkgname=$(awk -F= '/^pkgname=/ {gsub(/[" ]/,"",$2); print $2; exit}' "$PKGBUILD_SRC/PKGBUILD")
+
+# Compute a dev pkgver tied to the working tree. --porcelain catches modified,
+# staged, and untracked-not-ignored files — i.e. anything
+# `git ls-files -co --exclude-standard` will pull into the tarball.
+short_sha=$(git -C "$REPO" rev-parse --short HEAD)
+dirty=""
+if [[ -n $(git -C "$REPO" status --porcelain) ]]; then
+  dirty=".dirty"
+fi
+pkgver="dev.${short_sha}${dirty}"
+
+build_dir=$(mktemp -d -t omarchy-zsh-pkg-test.XXXXXX)
+trap 'rm -rf "$build_dir"' EXIT
+
+cp -a "$PKGBUILD_SRC"/. "$build_dir/"
+sed -i "s/^pkgver=.*/pkgver=${pkgver}/" "$build_dir/PKGBUILD"
+
+# Replace the upstream tarball with one built from the working tree.
+# `git ls-files -co --exclude-standard` includes tracked + untracked-not-ignored
+# files, read from disk, so uncommitted edits are picked up.
+#
+# omarchy-zsh's PKGBUILD untars to ${pkgname}-master (it pulls a branch
+# tarball, not a tag), so the prefix here stays "master" regardless of pkgver.
+# Only the tarball filename takes the new pkgver.
+(
+  cd "$REPO"
+  git ls-files -co --exclude-standard -z |
+    tar --null --transform "s,^,${pkgname}-master/," \
+        -czf "$build_dir/${pkgname}-${pkgver}.tar.gz" -T -
+)
+
+echo "Building ${pkgname} ${pkgver} (tarball: ${pkgname}-${pkgver}.tar.gz)"
+echo "makepkg working dir: $build_dir"
+echo
+
+cd "$build_dir"
+makepkg -si --skipchecksums "${@:2}"
