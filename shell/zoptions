@@ -154,7 +154,7 @@ if command -v fzf &>/dev/null; then
   zle -N fzf-git-log-widget
   bindkey '^[^L' fzf-git-log-widget  # Ctrl+Alt+L
 
-  # fzf variables search widget (Ctrl+V)
+  # fzf variables search widget (Ctrl+Alt+V)
   fzf-variables-widget() {
     local current_token="${LBUFFER##* }"
     local cleaned_token="${current_token#\$}"
@@ -174,7 +174,7 @@ if command -v fzf &>/dev/null; then
     zle reset-prompt
   }
   zle -N fzf-variables-widget
-  bindkey '^V' fzf-variables-widget  # Ctrl+V
+  bindkey '^[^V' fzf-variables-widget  # Ctrl+Alt+V
 fi
 
 # Plugins (shipped via the omarchy-zsh package's depends list).

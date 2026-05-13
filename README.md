@@ -62,7 +62,7 @@ omarchy-setup-zsh
 - **Ctrl+Alt+L** - Search Git Log
 - **Ctrl+R** - Search command history
 - **Ctrl+T** - Search files in current directory
-- **Ctrl+V** - Search Variables
+- **Ctrl+Alt+V** - Search Variables
 - **Alt+C** - cd into selected directory
 
 ## Customization
