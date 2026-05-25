@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-PKGBUILD_SRC="${1:-$HOME/Work/omarchy/omarchy-pkgs/pkgbuilds/edge/omarchy-zsh}"
+PKGBUILD_SRC="${1:-$HOME/Work/omarchy/omarchy-pkgs/pkgbuilds/omarchy-zsh}"
 
 if [[ ! -f $PKGBUILD_SRC/PKGBUILD ]]; then
   echo "PKGBUILD not found in: $PKGBUILD_SRC" >&2
@@ -32,13 +32,12 @@ sed -i "s/^pkgver=.*/pkgver=${pkgver}/" "$build_dir/PKGBUILD"
 # `git ls-files -co --exclude-standard` includes tracked + untracked-not-ignored
 # files, read from disk, so uncommitted edits are picked up.
 #
-# omarchy-zsh's PKGBUILD untars to ${pkgname}-master (it pulls a branch
-# tarball, not a tag), so the prefix here stays "master" regardless of pkgver.
-# Only the tarball filename takes the new pkgver.
+# Keep the archive's top-level directory aligned with the PKGBUILD's
+# package() cd target: ${srcdir}/${pkgname}-${pkgver}.
 (
   cd "$REPO"
   git ls-files -co --exclude-standard -z |
-    tar --null --transform "s,^,${pkgname}-master/," \
+    tar --null --transform "s,^,${pkgname}-${pkgver}/," \
         -czf "$build_dir/${pkgname}-${pkgver}.tar.gz" -T -
 )
 

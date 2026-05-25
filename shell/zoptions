@@ -73,10 +73,34 @@ bindkey "^[[B" history-search-forward
 bindkey "^[[C" forward-char
 bindkey "^[[D" backward-char
 
+# With MENU_COMPLETE, zsh inserts the match but holds the trailing space
+# until the menu is accepted, so the cursor visually sits flush with the
+# word and it's unclear that typing will continue a new argument. Wrap
+# menu-complete / reverse-menu-complete to append a real trailing space
+# and advance the cursor past it; strip the pad before cycling so each
+# Tab still rotates through matches cleanly.
+_omarchy-menu-complete() {
+  [[ $LASTWIDGET == _omarchy-menu-complete || $LASTWIDGET == _omarchy-reverse-menu-complete ]] \
+    && LBUFFER=${LBUFFER% }
+  zle menu-complete
+  LBUFFER+=' '
+}
+zle -N _omarchy-menu-complete
+
+_omarchy-reverse-menu-complete() {
+  [[ $LASTWIDGET == _omarchy-menu-complete || $LASTWIDGET == _omarchy-reverse-menu-complete ]] \
+    && LBUFFER=${LBUFFER% }
+  zle reverse-menu-complete
+  LBUFFER+=' '
+}
+zle -N _omarchy-reverse-menu-complete
+
+bindkey '^I' _omarchy-menu-complete
+
 # Shift-Tab cycles the completion menu backwards. The main-keymap binding
 # kicks in on the first press; the menuselect binding handles subsequent
 # presses once the highlighted menu is active.
-bindkey '^[[Z' reverse-menu-complete
+bindkey '^[[Z' _omarchy-reverse-menu-complete
 bindkey -M menuselect '^[[Z' reverse-menu-complete
 
 # Extended globbing
