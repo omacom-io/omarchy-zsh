@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ZSHRC="${ZDOTDIR:-$HOME}/.zshrc"
+PKG_ZOPTIONS_LINE='[[ -f /usr/share/omarchy-zsh/shell/zoptions ]] && source /usr/share/omarchy-zsh/shell/zoptions'
 
 if [[ ! -f $ZSHRC ]]; then
   echo "No ~/.zshrc found at $ZSHRC."
@@ -13,8 +14,19 @@ if ! grep -qE '^# >>> omarchy-zsh dev' "$ZSHRC"; then
   exit 0
 fi
 
-awk '
+has_packaged_zoptions=$(awk -v pkg_line="$PKG_ZOPTIONS_LINE" '
   /^# >>> omarchy-zsh dev/ { skip=1; next }
+  skip && /^# <<< omarchy-zsh dev/ { skip=0; next }
+  !skip && $0 == pkg_line { found=1 }
+  END { print found ? 1 : 0 }
+' "$ZSHRC")
+
+awk -v pkg_line="$PKG_ZOPTIONS_LINE" -v has_packaged_zoptions="$has_packaged_zoptions" '
+  /^# >>> omarchy-zsh dev/ {
+    skip=1
+    if (!has_packaged_zoptions) print pkg_line
+    next
+  }
   skip && /^# <<< omarchy-zsh dev/ { skip=0; next }
   !skip { print }
 ' "$ZSHRC" > "$ZSHRC.tmp"

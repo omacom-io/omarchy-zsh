@@ -1,5 +1,21 @@
 #compdef omarchy
 
+_omarchy_summary_from_file() {
+  local file="$1" line
+  REPLY=""
+
+  [[ -r $file ]] || return 1
+
+  while IFS= read -r line; do
+    if [[ $line == '# omarchy:summary='* ]]; then
+      REPLY="${line#'# omarchy:summary='}"
+      return 0
+    fi
+  done < "$file"
+
+  return 1
+}
+
 _omarchy() {
   local omarchy_path bin_dir
   omarchy_path=$(command -v omarchy 2>/dev/null) || return 0
@@ -14,9 +30,9 @@ _omarchy() {
     prefix+="-$part"
   done
 
-  local -A seen=()
-  local -a candidates=()
-  local file basename rest next
+  local -A seen=() descriptions=() descendant_counts=() has_exact_summary=()
+  local -a candidates=() described_candidates=()
+  local file basename rest next exact_file summary
 
   setopt local_options null_glob
   for file in "$bin_dir/$prefix"-*; do
@@ -24,25 +40,44 @@ _omarchy() {
     basename="${file:t}"
     rest="${basename#$prefix-}"
     next="${rest%%-*}"
-    if [[ -n $next && -z ${seen[$next]:-} ]]; then
+    [[ -z $next || $next == -* ]] && continue
+
+    (( descendant_counts[$next]++ ))
+
+    if [[ -z ${seen[$next]:-} ]]; then
       seen[$next]=1
       candidates+=("$next")
+
+      exact_file="$bin_dir/$prefix-$next"
+      if [[ -f $exact_file && -x $exact_file ]] && _omarchy_summary_from_file "$exact_file"; then
+        descriptions[$next]="$REPLY"
+        has_exact_summary[$next]=1
+      elif _omarchy_summary_from_file "$file"; then
+        descriptions[$next]="$REPLY"
+      fi
     fi
   done
 
   if (( CURRENT == 2 )); then
     candidates+=("commands")
+    descriptions[commands]="List documented Omarchy commands"
+    has_exact_summary[commands]=1
   fi
 
-  if [[ ${words[2]:-} == "commands" ]] && (( CURRENT >= 3 )); then
-    candidates+=("--all" "--json" "--markdown" "--check")
+  if (( ${#candidates[@]} == 0 )); then
+    return 0
   fi
 
-  if [[ -x "$bin_dir/$prefix" || ${#candidates[@]} -gt 0 ]]; then
-    candidates+=("--help")
-  fi
+  for next in "${candidates[@]}"; do
+    summary="${descriptions[$next]:-}"
+    if (( ${descendant_counts[$next]:-0} > 1 )) && [[ -z ${has_exact_summary[$next]:-} ]]; then
+      summary="Omarchy $next commands"
+    fi
+    summary="${summary//:/ -}"
+    described_candidates+=("$next:$summary")
+  done
 
-  (( ${#candidates[@]} > 0 )) && compadd -a candidates
+  _describe -t omarchy-commands 'omarchy command' described_candidates -S " " -q
 }
 
 _omarchy "$@"

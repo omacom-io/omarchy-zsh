@@ -5,6 +5,7 @@ REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 ZSHRC="${ZDOTDIR:-$HOME}/.zshrc"
 BEGIN_MARK="# >>> omarchy-zsh dev >>>"
 END_MARK="# <<< omarchy-zsh dev <<<"
+PKG_ZOPTIONS_LINE='[[ -f /usr/share/omarchy-zsh/shell/zoptions ]] && source /usr/share/omarchy-zsh/shell/zoptions'
 
 usage() {
   cat <<USAGE
@@ -62,10 +63,10 @@ if [[ ! -f $ZSHRC ]]; then
 fi
 
 # zsh has no auto-prepended user vendor dir like fish's vendor_*.d/.
-# Instead of symlinking into /usr/share/zsh/site-functions/ (sudo), we inject
-# an idempotent block at the bottom of ~/.zshrc that points fpath at the
-# working tree, re-sources zoptions, and (optionally) shadows omadots'
-# shared shell config from a local checkout.
+# Instead of symlinking into /usr/share/zsh/site-functions/ (sudo), replace
+# the packaged zoptions source line in ~/.zshrc with an idempotent dev block.
+# This matters because zoptions can load plugins; sourcing the packaged
+# zoptions first would leave removed plugins active before the dev copy loads.
 {
   printf '%s\n' "$BEGIN_MARK"
   printf 'fpath=("%s/shell/completions" $fpath)\n' "$REPO"
@@ -91,19 +92,33 @@ fi
   printf '%s\n' "$END_MARK"
 } > "$ZSHRC.snippet"
 
-# Always drop any existing block, then append fresh — keeps the script
-# idempotent without conditional plumbing and survives manual edits inside
-# the block. Match marker prefix so older block variants are still caught.
+# Always drop any existing block, then replace the packaged zoptions source
+# line with the fresh dev block. If a custom ~/.zshrc no longer has the
+# packaged source line, append the block as a fallback.
 awk '
   /^# >>> omarchy-zsh dev/ { skip=1; next }
   skip && /^# <<< omarchy-zsh dev/ { skip=0; next }
   !skip { print }
 ' "$ZSHRC" > "$ZSHRC.tmp"
-mv "$ZSHRC.tmp" "$ZSHRC"
 
-printf '\n' >> "$ZSHRC"
-cat "$ZSHRC.snippet" >> "$ZSHRC"
-rm -f "$ZSHRC.snippet"
+awk -v snippet="$ZSHRC.snippet" -v pkg_line="$PKG_ZOPTIONS_LINE" '
+  $0 == pkg_line && !inserted {
+    while ((getline line < snippet) > 0) print line
+    close(snippet)
+    inserted=1
+    next
+  }
+  { print }
+  END {
+    if (!inserted) {
+      print ""
+      while ((getline line < snippet) > 0) print line
+      close(snippet)
+    }
+  }
+' "$ZSHRC.tmp" > "$ZSHRC"
+
+rm -f "$ZSHRC.tmp" "$ZSHRC.snippet"
 
 echo "Linked $REPO into $ZSHRC"
 [[ -n $omadots ]] && echo "Overlaying omadots from $omadots"

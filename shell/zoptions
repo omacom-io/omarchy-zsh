@@ -19,8 +19,11 @@ setopt HIST_VERIFY              # Don't execute immediately upon history expansi
 # Completion configuration
 setopt COMPLETE_IN_WORD         # Complete from both ends of word
 setopt ALWAYS_TO_END            # Move cursor to end after completion
-setopt MENU_COMPLETE            # Insert first match on tab, cycle on repeat
-setopt AUTO_MENU                # Show completion menu on tab
+unsetopt MENU_COMPLETE          # Don't jump into menu selection on first tab
+unsetopt BASH_AUTO_LIST         # Let AUTO_LIST below list immediately when ambiguous
+setopt AUTO_LIST                # List choices when completion is ambiguous
+setopt LIST_AMBIGUOUS           # Insert any shared prefix before listing choices
+setopt AUTO_MENU                # Enter menu selection on repeated tab after listing
 
 # Initialize the zsh completion system. The _omarchy completion ships to
 # /usr/share/zsh/site-functions/, which is on the default fpath.
@@ -67,40 +70,76 @@ zstyle ':completion:*' match-hidden-files off
 # the unified `omarchy` dispatcher is the user-facing entry point.
 zstyle ':completion:*:-command-:*' ignored-patterns 'omarchy-*'
 
+# Don't complete shell variables anywhere in Tab completion. The Ctrl+Alt+V
+# fzf widget remains available for intentionally inserting variables.
+_parameters() { return 1 }
+
 # Arrow keys: history search matching current input
 bindkey "^[[A" history-search-backward
 bindkey "^[[B" history-search-forward
 bindkey "^[[C" forward-char
 bindkey "^[[D" backward-char
 
-# With MENU_COMPLETE, zsh inserts the match but holds the trailing space
-# until the menu is accepted, so the cursor visually sits flush with the
-# word and it's unclear that typing will continue a new argument. Wrap
-# menu-complete / reverse-menu-complete to append a real trailing space
-# and advance the cursor past it; strip the pad before cycling so each
-# Tab still rotates through matches cleanly.
-_omarchy-menu-complete() {
-  [[ $LASTWIDGET == _omarchy-menu-complete || $LASTWIDGET == _omarchy-reverse-menu-complete ]] \
-    && LBUFFER=${LBUFFER% }
-  zle menu-complete
-  LBUFFER+=' '
-}
-zle -N _omarchy-menu-complete
+# Omarchy command routes should feel like bash menu completion: typing a
+# partial route such as `omarchy br<Tab>` inserts the first route match
+# (`branch `), while repeated Tabs enter zsh's highlighted completion menu
+# and cycle through the same sibling matches. Empty-prefix completions such
+# as `omarchy <Tab>` fall back to zsh's normal completion listing.
+typeset -gi _omarchy_tab_route_active=0
 
-_omarchy-reverse-menu-complete() {
-  [[ $LASTWIDGET == _omarchy-menu-complete || $LASTWIDGET == _omarchy-reverse-menu-complete ]] \
-    && LBUFFER=${LBUFFER% }
-  zle reverse-menu-complete
-  LBUFFER+=' '
-}
-zle -N _omarchy-reverse-menu-complete
+_omarchy-route-complete-or-expand() {
+  emulate -L zsh
+  setopt extended_glob
+  unsetopt beep
 
-bindkey '^I' _omarchy-menu-complete
+  local trigger="${FZF_COMPLETION_TRIGGER-'**'}"
+  if [[ -n $trigger && $LBUFFER == *$trigger && ${+widgets[fzf-completion]} -eq 1 ]]; then
+    zle fzf-completion
+    return $?
+  fi
+
+  if [[ $LASTWIDGET == _omarchy-route-complete-or-expand && $_omarchy_tab_route_active -eq 1 ]]; then
+    setopt auto_list
+    zstyle ':completion:*' menu select
+    zle menu-complete
+    zle menu-select
+    return $?
+  fi
+
+  _omarchy_tab_route_active=0
+
+  if [[ -z $RBUFFER && $LBUFFER == omarchy[[:space:]]* && $LBUFFER != *[[:space:]] ]]; then
+    local current="${LBUFFER##*[[:space:]]}"
+    if [[ -n $current && $current != -* ]]; then
+      unsetopt auto_list bash_auto_list
+      zstyle ':completion:*' menu yes
+      zle menu-complete
+      _omarchy_tab_route_active=1
+      return $?
+    fi
+  fi
+
+  setopt auto_list
+  zstyle ':completion:*' menu select
+  zle expand-or-complete
+}
+zle -N _omarchy-route-complete-or-expand
+
+_omarchy-bind-tab-completion() {
+  bindkey '^I' _omarchy-route-complete-or-expand
+}
+_omarchy-bind-tab-completion
+
+# fzf's zsh completion script is loaded later by shell/inits and also binds
+# Tab. Re-apply Omarchy's Tab widget after startup; the widget above still
+# delegates to fzf when the configured fzf trigger (default: **) is present.
+autoload -Uz add-zsh-hook
+add-zsh-hook precmd _omarchy-bind-tab-completion
 
 # Shift-Tab cycles the completion menu backwards. The main-keymap binding
 # kicks in on the first press; the menuselect binding handles subsequent
 # presses once the highlighted menu is active.
-bindkey '^[[Z' _omarchy-reverse-menu-complete
+bindkey '^[[Z' reverse-menu-complete
 bindkey -M menuselect '^[[Z' reverse-menu-complete
 
 # Extended globbing
@@ -203,12 +242,6 @@ fi
 
 # Plugins (shipped via the omarchy-zsh package's depends list).
 #
-# zsh-autosuggestions: gray inline suggestion of the most recent matching
-# history entry; accept with → / End. Sourced after compinit and after
-# the fzf zle widgets per the plugin's recommended ordering.
-[[ -f /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && \
-  source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
-
 # zsh-syntax-highlighting: colors valid commands as you type. MUST be
 # sourced last so it sees every previously-defined ZLE widget — adding
 # anything below this line will skip highlighting for that widget.
